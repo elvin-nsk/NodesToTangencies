@@ -1,0 +1,14 @@
+{
+    "Description": "",
+    "DocumentModuleName": "ThisMacroStorage",
+    "References": [
+        {
+            "Name": "Scripting",
+            "Type": 0,
+            "GUID": "{420B2830-E718-11CF-893D-00A0C9054228}",
+            "Major": 1,
+            "Minor": 0,
+            "FullPath": "C:\\Windows\\System32\\scrrun.dll"
+        }
+    ]
+}
