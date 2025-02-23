@@ -1,7 +1,7 @@
 Attribute VB_Name = "NodesToTangencies"
 '===============================================================================
 '   Макрос          : NodesToTangencies
-'   Версия          : 2025.02.20
+'   Версия          : 2025.02.23
 '   Сайты           : https://vk.com/elvin_macro
 '                     https://github.com/elvin-nsk
 '   Автор           : elvin-nsk (me@elvin.nsk.ru)
@@ -14,7 +14,7 @@ Option Explicit
 
 Public Const APP_NAME As String = "NodesToTangencies"
 Public Const APP_DISPLAYNAME As String = APP_NAME
-Public Const APP_VERSION As String = "2025.02.20"
+Public Const APP_VERSION As String = "2025.02.23"
 
 '===============================================================================
 ' # Globals
@@ -75,10 +75,11 @@ Private Sub ProcessCurve( _
                 ByVal DeleteSourceNodes As Boolean _
             )
     Dim Points As New Collection, PointsToKeep As New Collection
+    If DeleteSourceNodes Then Curve.Nodes.All.Smoothen 0
     FindTangents Curve, 0, Points, PointsToKeep
     FindTangents Curve, 90, Points, PointsToKeep
     #If DebugMode = 1 Then
-    MakeMarks(Points, Red).OrderToBack
+    MakeMarks(Points, Blue).OrderToBack
     MakeMarks(PointsToKeep, Green).OrderToBack
     #End If
     If Points.Count = 0 Then Exit Sub
@@ -103,24 +104,27 @@ Private Sub FindTangents( _
     Dim Offset1 As Double, Offset2 As Double, n As Long
     For Each Segment In Curve.Segments
         n = Segment.GetPeaks(Angle, Offset1, Offset2, cdrParamSegmentOffset)
-        If n > 1 Then AddPointIfValid Segment, Offset2, PointsPool, PointsToKeepPool
-        If n > 0 Then AddPointIfValid Segment, Offset1, PointsPool, PointsToKeepPool
+        If n > 1 Then SortPoint Segment, Offset2, PointsPool, PointsToKeepPool
+        If n > 0 Then SortPoint Segment, Offset1, PointsPool, PointsToKeepPool
     Next Segment
 End Sub
 
-Private Sub AddPointIfValid( _
+Private Sub SortPoint( _
                 ByVal Segment As Segment, _
                 ByVal ParamOffset As Double, _
                 ByVal PointsPool As Collection, _
                 ByVal PointsToKeepPool As Collection _
             )
-    If ParamOffset = 0 Or ParamOffset = 1 Then Exit Sub
     Dim Point As Point: Set Point = OffsetToPoint(Segment, ParamOffset)
+    If ParamOffset = 0 Or ParamOffset = 1 Then
+        PointsToKeepPool.Add Point
+        Exit Sub
+    End If
     If IsNodeMatchPoint(Segment.StartNode, Point) _
     Or IsNodeMatchPoint(Segment.EndNode, Point) Then
         PointsToKeepPool.Add Point
     Else
-        PointsPool.Add OffsetToPoint(Segment, ParamOffset)
+        PointsPool.Add Point
     End If
 End Sub
 
@@ -154,8 +158,11 @@ Private Property Get FindNodesToDelete( _
     Dim Node As Node
     For Each Node In Curve.Nodes
         If Not Node.IsEnding Then
-            If Not IsNodeMatchPoints(Node, PointsToKeep) Then
-                FindNodesToDelete.Add Node
+            If Not Node.Type = cdrCuspNode _
+           And Not Node.Segment.Type = cdrLineSegment Then
+                If Not IsNodeMatchPoints(Node, PointsToKeep) Then
+                    FindNodesToDelete.Add Node
+                End If
             End If
         End If
     Next Node
@@ -204,6 +211,6 @@ End Function
 '===============================================================================
 ' # Tests
 
-Private Sub TestSomething()
-'
+Private Sub TestSmooth()
+    ActiveSelectionRange.FirstShape.Curve.Nodes.All.Smoothen 0
 End Sub
