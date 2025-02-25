@@ -1,7 +1,7 @@
 Attribute VB_Name = "NodesToTangencies"
 '===============================================================================
 '   Макрос          : NodesToTangencies
-'   Версия          : 2025.02.23
+'   Версия          : 2025.02.25
 '   Сайты           : https://vk.com/elvin_macro
 '                     https://github.com/elvin-nsk
 '   Автор           : elvin-nsk (me@elvin.nsk.ru)
@@ -14,12 +14,13 @@ Option Explicit
 
 Public Const APP_NAME As String = "NodesToTangencies"
 Public Const APP_DISPLAYNAME As String = APP_NAME
-Public Const APP_VERSION As String = "2025.02.23"
+Public Const APP_VERSION As String = "2025.02.25"
 
 '===============================================================================
 ' # Globals
 
-Private Const SIZE_TO_TOLERANCE_MULT As Double = 0.001
+Private Const SIZE_TO_TOLERANCE_MULT As Double = 0.01
+Private Const SMOOTH_ANGLE_TOLERANCE As Double = 0.1
 
 '===============================================================================
 ' # Entry points
@@ -157,8 +158,11 @@ Private Property Get FindNodesToDelete( _
     Set FindNodesToDelete = CreateNodeRange
     Dim Node As Node
     For Each Node In Curve.Nodes
+        #If DebugMode = 1 Then
+        DebugShowNodeInfo Node
+        #End If
         If Not Node.IsEnding Then
-            If Not Node.Type = cdrCuspNode _
+            If IsSmooth(Node) _
            And Not Node.Segment.Type = cdrLineSegment Then
                 If Not IsNodeMatchPoints(Node, PointsToKeep) Then
                     FindNodesToDelete.Add Node
@@ -166,6 +170,26 @@ Private Property Get FindNodesToDelete( _
             End If
         End If
     Next Node
+End Property
+
+Private Property Get IsSmooth(ByVal Node As Node) As Boolean
+    If Node.Index = 1 Then
+        If Node.Segment.Type = cdrLineSegment Then Exit Property
+        If IsNone(Node.Segment.Previous) _
+        Or IsNone(Node.Segment.Next) Then
+            IsSmooth = Not Node.Type = cdrCuspNode
+            Exit Property
+        End If
+        If Node.Segment.Next.Type = cdrLineSegment Then Exit Property
+        Dim Angle As Double: Angle = _
+            Abs( _
+                Node.Segment.StartingControlPointAngle _
+              - Node.Segment.Previous.EndingControlPointAngle _
+            )
+        If IsApproximate(Angle, 180, SMOOTH_ANGLE_TOLERANCE) Then IsSmooth = True
+    Else
+        IsSmooth = Not Node.Type = cdrCuspNode
+    End If
 End Property
 
 Private Property Get IsNodeMatchPoints( _
@@ -207,6 +231,27 @@ Private Function MakeMarks(ByVal Points As Collection, ByVal Color As Color) As 
         MakeMarks.Add MakeCircle(Point.x, Point.y, 1, Color)
     Next Point
 End Function
+
+Private Sub DebugShowNodeInfo(ByVal Node As Node)
+    On Error Resume Next
+    Dim Angle As Double: Angle = _
+        Abs( _
+            Node.Segment.StartingControlPointAngle _
+          - Node.Segment.Previous.EndingControlPointAngle _
+        )
+    Dim Info As String: Info = IIf(IsSmooth(Node), "Smooth", "Cusp")
+    'ActiveLayer.CreateArtisticText Node.PositionX, Node.PositionY, Info, , , , 5
+    'ActiveLayer.CreateArtisticText Node.PositionX, Node.PositionY, Node.Index, , , , 5
+    'ActiveLayer.CreateArtisticText Node.PositionX, Node.PositionY, Angle, , , , 5
+    
+    'two angles
+    'ActiveLayer.CreateArtisticText Node.PositionX, Node.PositionY, Node.Segment.StartingControlPointAngle, , , , 5
+    'ActiveLayer.CreateArtisticText(Node.PositionX, Node.PositionY, Node.Segment.Previous.EndingControlPointAngle, , , , 5).Fill.ApplyUniformFill Blue
+    
+    'MakeCircle Node.PositionX, Node.PositionY, 1, Red
+    'ActiveLayer.CreateArtisticText Node.PositionX, Node.PositionY, (Node.Segment.Type = cdrLineSegment Or Node.Segment.Previous.Type = cdrLineSegment), , , , 5
+    On Error GoTo 0
+End Sub
 
 '===============================================================================
 ' # Tests
